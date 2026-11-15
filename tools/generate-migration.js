@@ -1,0 +1,10 @@
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const schema='server/prisma/postgresql/schema.prisma';
+mkdirSync('server/prisma/postgresql/migrations/202611140001_initial',{recursive:true});
+writeFileSync(schema,readFileSync('server/prisma/schema.prisma','utf8').replace('provider = "sqlite"','provider = "postgresql"'));
+const result=spawnSync(process.execPath,['node_modules/prisma/build/index.js','migrate','diff','--from-empty','--to-schema-datamodel',schema,'--script'],{encoding:'utf8',env:{...process.env,DATABASE_URL:'postgresql://placeholder:placeholder@localhost:5432/pos'}});
+if(result.status!==0)throw new Error(result.stderr);
+writeFileSync('server/prisma/postgresql/migrations/202611140001_initial/migration.sql',result.stdout);
+writeFileSync('server/prisma/postgresql/migrations/migration_lock.toml','provider = "postgresql"\n');
+console.log('Generated initial PostgreSQL migration.');

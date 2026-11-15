@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pos
+      POSTGRES_USER: pos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      TZ: Asia/Kolkata
+    volumes:
+      - pos_database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U pos -d pos']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '8080:3001'
+    environment:
+      DATABASE_URL: postgresql://pos:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/pos
+      DB_PROVIDER: postgresql
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?Set OWNER_PASSWORD in .env}
+      STAFF_PASSWORD: ${STAFF_PASSWORD:?Set STAFF_PASSWORD in .env}
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+      BACKUP_DIR: /app/backups
+      TZ: Asia/Kolkata
+    volumes:
+      - pos_backups:/app/backups
+volumes:
+  pos_database:
+  pos_backups:

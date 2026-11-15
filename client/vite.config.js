@@ -1,0 +1,4 @@
+import {defineConfig} from 'vite';
+import react from '@vitejs/plugin-react';
+import {VitePWA} from 'vite-plugin-pwa';
+export default defineConfig({plugins:[react(),VitePWA({registerType:'prompt',includeAssets:['icon.svg','logo.png'],manifest:{name:'Al-Raiyan VKC Show Room',short_name:'Al-Raiyan POS',description:'Simple footwear billing and inventory',theme_color:'#092d91',background_color:'#f4f6fa',display:'standalone',start_url:'/',lang:'ta-IN',icons:[{src:'/icon-192.png',sizes:'192x192',type:'image/png'},{src:'/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any maskable'}]},workbox:{globPatterns:['**/*.{js,css,html,svg,png,woff2,ttf,csv}'],navigateFallbackDenylist:[/^\/api/],cleanupOutdatedCaches:true}})],server:{host:'0.0.0.0',port:5173,proxy:{'/api':'http://127.0.0.1:3001'}},preview:{host:'0.0.0.0',port:4173,proxy:{'/api':'http://127.0.0.1:3001'}},build:{chunkSizeWarningLimit:900}});

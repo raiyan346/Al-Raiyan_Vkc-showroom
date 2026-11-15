@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+server/prisma/active.prisma
+backups/
+coverage/
+test-results/
+playwright-report/
+*.log
+server/prisma/alraiyan-test-*/
+.artifacts/
+server/prisma/postgresql/schema.prisma
