@@ -38,7 +38,7 @@ npm.cmd run db:reset:demo -- --confirm-demo-reset
 
 Migration commands refuse a mismatched environment. Hosted startup refuses destructive migration SQL. Generate and review migrations locally; never reset production. Demo reset requires `APP_ENV=demo`, `DEMO_MODE=true`, matching URL pins, the persisted demo marker, the actual `vkc_demo` database name, and the explicit confirmation flag. It removes only the fictional demo data, then reseeds 42 size/colour variants and sample transactions. Run it periodically as an operator, with the demo migration credentials; never give those credentials to visitors.
 
-Initial production accounts come from protected environment configuration. Existing accounts and shop records are preserved. To change the Owner password through the operator CLI, supply `OWNER_PASSWORD` securely and run `npm.cmd run admin:password -- --confirm-owner-change`. This revokes the Owner's sessions and does not touch shop transactions.
+Initial production accounts come from protected environment configuration. `OWNER_USERNAME` selects the initial admin username (default `owner`); seeding preserves an existing active Owner after a username change. Existing accounts and shop records are preserved. To change the Owner password through the operator CLI, supply `OWNER_USERNAME` and `OWNER_PASSWORD` securely and run `npm.cmd run admin:password -- --confirm-owner-change`. This revokes the Owner's sessions and does not touch shop transactions.
 
 ## Develop, verify demo, then promote manually
 

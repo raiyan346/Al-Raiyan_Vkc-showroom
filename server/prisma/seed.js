@@ -14,7 +14,9 @@ async function main(){
  await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop'}});
  const passwords={OWNER:process.env.OWNER_PASSWORD,STAFF:process.env.STAFF_PASSWORD};
  for(const [role,password] of Object.entries(passwords)){
-  const username=role.toLowerCase();if(await db.user.findUnique({where:{username}}))continue;
+  // Preserve the shop's existing Owner even after the login username is changed.
+  if(appEnv==='production'&&role==='OWNER'&&await db.user.findFirst({where:{role:'OWNER',active:true}}))continue;
+  const username=role==='OWNER'?(process.env.OWNER_USERNAME||'owner'):role.toLowerCase();if(await db.user.findUnique({where:{username}}))continue;
   if(!password||password.length<10||password.startsWith('choose-'))throw new Error(`Set ${role}_PASSWORD in .env to at least 10 characters before seeding.`);
   await db.user.create({data:{username,name:role==='OWNER'?'Shop Owner':'Shop Staff',role,passwordHash:await bcrypt.hash(password,12)}});
  }
