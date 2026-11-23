@@ -1,0 +1,37 @@
+# A separate sample-data demo. No paid database or disk is provisioned.
+services:
+  - type: web
+    name: al-raiyan-pos-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: DB_PROVIDER
+        value: postgresql
+      # Use a NEW dedicated Neon database, direct URL, with sslmode=require.
+      # Add connect_timeout=30 and connection_limit=5 to its query parameters.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OWNER_PASSWORD
+        generateValue: true
+      - key: STAFF_PASSWORD
+        generateValue: true
+      - key: SEED_SAMPLE_DATA
+        value: "true"
+      - key: DEMO_MODE
+        value: "true"
+      # Render terminates HTTPS and forwards through its reverse proxy.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: BACKUP_DIR
+        value: /app/backups

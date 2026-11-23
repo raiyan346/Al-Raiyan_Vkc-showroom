@@ -10,6 +10,7 @@ import {parse} from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import {db,transaction} from './db.js';
 import {secret} from './config.js';
+import {demoMode,protectDemo} from './demo.js';
 import {encodeCost,decodeCost,validateCipher,toPaise,rupees,weightedCost} from '@alraiyan/core';
 import {createSale,createReturn,collectCredit,publicSale,saleInclude} from './sales.js';
 import {report,cashClosing,indiaDay} from './reports.js';
@@ -18,7 +19,11 @@ import {backup} from './backup.js';
 import {stockTransaction} from './stock-operations.js';
 import {catalogue,serializeProduct,productInclude,findBarcode,saveArticle,articleDetails,attachLegacyVariant} from './inventory.js';
 export const app=express();app.disable('x-powered-by');
+const proxyHops=Number(process.env.TRUST_PROXY_HOPS||0);
+if(!Number.isInteger(proxyHops)||proxyHops<0||proxyHops>5)throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 5.');
+if(proxyHops)app.set('trust proxy',proxyHops);
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
+if(demoMode)app.use((req,res,next)=>{res.set('X-Robots-Tag','noindex, nofollow');next();});
 app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"],'img-src':["'self'",'data:','blob:','https:'],'connect-src':["'self'"],'style-src':["'self'","'unsafe-inline'"]}}}));
 app.use(express.json({limit:'12mb'}));
 const route=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
@@ -28,6 +33,7 @@ const text=z.string().trim().min(1).max(150);
 const productSchema=z.object({name:text,brand:text,category:text,size:text,color:text,mrp:z.number().int().nonnegative().max(1000000000),purchasePrice:z.number().int().nonnegative().max(1000000000).optional(),quantity:z.number().int().nonnegative().max(100000).default(0),photo:z.string().max(1500000).refine(s=>!s||/^data:image\/(png|jpeg|webp);base64,/.test(s)||/^https:\/\//.test(s),'Use an HTTPS image or PNG/JPEG/WebP upload.').nullable().optional()});
 const personSchema=z.object({name:text,phone:z.string().regex(/^(?:\+91)?[6-9]\d{9}$/,'Enter a valid Indian mobile number.').transform(s=>s.replace(/^\+91/,'')),address:z.string().max(500).optional()});
 const loginLimiter=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});
+app.get('/api/config',(req,res)=>res.json({demoMode}));
 app.get('/api/health',route(async(req,res)=>{await db.$queryRaw`SELECT 1`;res.json({ok:true});}));
 app.post('/api/auth/login',loginLimiter,route(async(req,res)=>{
  const data=z.object({username:text,password:z.string().min(1).max(200)}).parse(req.body);
@@ -40,8 +46,13 @@ app.use('/api',route(async(req,res,next)=>{
  try{const token=req.headers.authorization?.replace(/^Bearer /,'');const claims=jwt.verify(token,secret,{algorithms:['HS256']});const user=await db.user.findUnique({where:{id:claims.sub}});if(!user?.active||claims.v!==user.tokenVersion)throw new Error();req.user=user;next();}catch{return res.status(401).json({error:'Please sign in again. Your saved offline bills are still on this device.'});}
 }));
 app.get('/api/auth/me',(req,res)=>res.json({id:req.user.id,name:req.user.name,role:req.user.role}));
+app.use('/api',protectDemo);
+if(demoMode){
+ const writeLimiter=rateLimit({windowMs:15*60*1000,limit:100,standardHeaders:'draft-7',legacyHeaders:false,message:{error:'Demo request limit reached. Please try again later.'}});
+ app.use('/api',(req,res,next)=>['GET','HEAD','OPTIONS'].includes(req.method)?next():writeLimiter(req,res,next));
+}
 app.post('/api/auth/password',route(async(req,res)=>{const data=z.object({current:z.string(),password:z.string().min(10).max(200)}).parse(req.body);if(!await bcrypt.compare(data.current,req.user.passwordHash))throw new Error('Current password is incorrect.');await db.user.update({where:{id:req.user.id},data:{passwordHash:await bcrypt.hash(data.password,12),tokenVersion:{increment:1}}});res.json({ok:true});}));
-app.get('/api/settings',route(async(req,res)=>{const {cipher,...s}=await db.setting.findUniqueOrThrow({where:{id:'shop'}});res.json(req.user.role==='OWNER'?{...s,cipher}:s);}));
+app.get('/api/settings',route(async(req,res)=>{const {cipher,...s}=await db.setting.findUniqueOrThrow({where:{id:'shop'}});res.json({...s,...(req.user.role==='OWNER'?{cipher}:{}),demoMode});}));
 app.put('/api/settings',owner,route(async(req,res)=>{const data=z.object({shopName:text,address:z.string().max(500),phone:z.string().max(20),cipher:z.string().refine(s=>{try{validateCipher(s);return true;}catch{return false;}},'Use ten unique uppercase letters.'),lowStock:z.number().int().min(0).max(1000),sizeSystems:z.string().trim().min(1).max(500).optional()}).parse(req.body);res.json(await db.setting.update({where:{id:'shop'},data}));}));
 app.post('/api/cost-code/decode',owner,route(async(req,res)=>{const s=await db.setting.findUniqueOrThrow({where:{id:'shop'}});res.json({amount:decodeCost(z.string().parse(req.body.code),s.cipher)});}));
 app.get('/api/users',owner,route(async(req,res)=>res.json(await db.user.findMany({select:{id:true,name:true,username:true,role:true,active:true}}))));

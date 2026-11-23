@@ -4,6 +4,8 @@ A working React + Express + Prisma showroom POS, using the supplied Stitch scree
 
 The article/size inventory upgrade and phone-scanner guide is in [docs/FOOTWEAR-INVENTORY.md](docs/FOOTWEAR-INVENTORY.md).
 
+For a separate free sample-data deployment, see [Render + Neon demo hosting](docs/FREE-DEMO-HOSTING.md). The root `render.yaml` selects a Free web service and enables demo safeguards; use a new dedicated database.
+
 ## Start on this Windows computer
 
 Node.js 22 is required. The project already has a local `.env` and sample SQLite database created during development. If starting from a fresh copy, follow the next section first.

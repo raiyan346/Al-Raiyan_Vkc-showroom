@@ -4,8 +4,10 @@ import {randomUUID} from 'node:crypto';
 import {db} from '../src/db.js';
 import {createSale} from '../src/sales.js';
 import {backfillInventory} from '../src/inventory.js';
+import {demoMode,demoShopName,checkDemoDatabase} from '../src/demo.js';
 async function main(){
- await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop'}});
+ await checkDemoDatabase(db);
+ await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop',...(demoMode?{shopName:demoShopName,address:'Sample data only — no real transactions',phone:''}:{})}});
  const passwords={OWNER:process.env.OWNER_PASSWORD,STAFF:process.env.STAFF_PASSWORD};
  for(const [role,password] of Object.entries(passwords)){
   const username=role.toLowerCase();if(await db.user.findUnique({where:{username}}))continue;
@@ -33,8 +35,9 @@ async function main(){
   const p=await db.product.create({data:{name,brand,category,size,color,mrp:mrp*100,purchasePrice:cost*100,quantity,barcode:`ARDEMO${String(n+1).padStart(6,'0')}`,...(n===11?{createdAt:new Date(Date.now()-75*86400000)}:{})}});
   await db.stockMovement.create({data:{productId:p.id,delta:quantity,kind:'OPENING',actorId:owner.id,note:'Sample stock'}});
  }
- const supplier=await db.supplier.create({data:{name:'Sample Footwear Distributor',phone:'9876543210',address:'Tamil Nadu'}});
- const customer=await db.customer.create({data:{name:'Sample Customer',phone:'9876543211'}});
+ // Intentionally non-dialable placeholders for the hosted demo.
+ const supplier=await db.supplier.create({data:{name:'Sample Footwear Distributor',phone:demoMode?'0000000000':'9876543210',address:'Tamil Nadu'}});
+ const customer=await db.customer.create({data:{name:'Sample Customer',phone:demoMode?'0000000001':'9876543211'}});
  const products=await db.product.findMany({orderBy:{barcode:'asc'}});
  for(const [i,mode] of ['CASH','UPI','CREDIT'].entries())await createSale({id:randomUUID(),items:[{productId:products[i].id,quantity:i+1,unitPrice:products[i].mrp-5000}],discount:i===0?1000:0,paymentMode:mode,cashTendered:mode==='CASH'?100000:0,customerId:mode==='CREDIT'?customer.id:null,soldAt:new Date().toISOString()},owner);
  await db.expense.create({data:{category:'Tea & Snacks',note:'Sample expense',amount:15000,actorId:owner.id}});

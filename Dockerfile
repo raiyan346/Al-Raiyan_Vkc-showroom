@@ -19,5 +19,5 @@ COPY --from=build --chown=node:node /app /app
 ENV NODE_ENV=production PORT=3001 DB_PROVIDER=postgresql BACKUP_DIR=/app/backups
 USER node
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD node -e "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["sh","-c","npm run db:setup && npm run db:seed && npm start"]

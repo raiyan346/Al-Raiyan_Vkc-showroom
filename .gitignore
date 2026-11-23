@@ -1,12 +1,17 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
 *.db
 *.db-journal
 *.db-shm
 *.db-wal
 server/prisma/active.prisma
 backups/
+downloaded-backups/
 coverage/
 test-results/
 playwright-report/
