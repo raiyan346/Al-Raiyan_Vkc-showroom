@@ -168,6 +168,24 @@ test('linking legacy stock preserves variant ID, quantity, cost, barcode and his
  const after=await db.product.findUnique({where:{id:legacy.id}});assert.equal(after.articleId,footwear.id);for(const key of ['id','quantity','purchasePrice','barcode','mrp'])assert.equal(after[key],before[key]);
  const history=await db.saleItem.findUnique({where:{id:sold.body.items[0].id}});assert.equal(history.name,'Old sandal');assert.equal(history.articleSnapshot,'');assert.equal(history.unitCost,25000);
 });
+test('only owners can download private backups and filenames cannot escape the backup directory',async()=>{
+ process.env.BACKUP_DIR=path.join(dir,'backups');
+ const saved=await request(app).post('/api/backups').set(auth(ownerToken)).send({});
+ assert.equal(saved.status,200);
+ const url='/api/backups/'+encodeURIComponent(saved.body.file);
+ assert.equal((await request(app).get(url)).status,401);
+ assert.equal((await request(app).get(url).set(auth(staffToken))).status,403);
+ const downloaded=await request(app).get(url).set(auth(ownerToken));
+ assert.equal(downloaded.status,200);
+ assert.match(downloaded.headers['content-disposition'],/attachment/);
+ assert.match(downloaded.headers['content-type'],/application\/octet-stream/);
+ assert.equal(downloaded.headers['cache-control'],'no-store');
+ const snapshot=JSON.parse(downloaded.body.toString('utf8'));
+ assert.equal(snapshot.version,2);
+ assert.equal(snapshot.user.length,await db.user.count());
+ assert.equal((await request(app).get('/api/backups/'+encodeURIComponent('../.env')).set(auth(ownerToken))).status,400);
+});
+
 test('backup restores all records atomically into an empty database and refuses overwrite',async()=>{
  process.env.BACKUP_DIR=path.join(dir,'backups');
  const {backup}=await import('../src/backup.js');const name=await backup();const filename=path.join(dir,'backups',name);const snapshot=JSON.parse(readFileSync(filename,'utf8'));

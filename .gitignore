@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
+hosting-credentials.txt
 *.db
 *.db-journal
 *.db-shm

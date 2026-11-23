@@ -5,11 +5,13 @@
     "dev": "concurrently -k -n API,WEB \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
     "start": "npm start -w server",
+    "start:render": "npm run db:setup && npm run db:seed && npm start",
     "db:setup": "npm run db:setup -w server",
     "db:seed": "npm run db:seed -w server",
     "test": "npm test -w packages/core && npm test -w server",
     "test:browser": "node tools/browser-run.js"
   },
+  "engines": {"node": ">=22.16.0 <23"},
   "devDependencies": {"concurrently": "^9.1.2", "@playwright/test": "^1.56.1"},
-  "overrides": {"deepmerge-ts":"^8.0.0", "effect":"^3.20.0", "exceljs":{"uuid":"^11.1.1"}}
+  "overrides": {"deepmerge-ts":"^8.0.0", "effect":"^3.20.0", "exceljs":{"uuid":"^11.1.1"}, "workbox-build":{"glob":"^14.0.6", "minimatch":"^11.0.9"}}
 }

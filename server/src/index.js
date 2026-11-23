@@ -12,4 +12,6 @@ const tls=process.env.TLS_KEY_PATH&&process.env.TLS_CERT_PATH;
 const server=tls?createServer({key:readFileSync(process.env.TLS_KEY_PATH),cert:readFileSync(process.env.TLS_CERT_PATH)},app):app;
 const listener=server.listen(port,'0.0.0.0',()=>console.log(`Al-Raiyan POS: ${tls?'https':'http'}://localhost:${port}`));
 scheduleBackups();
-async function stop(){listener.close();await db.$disconnect();process.exit(0);}process.on('SIGTERM',stop);process.on('SIGINT',stop);
+let stopping=false;
+function stop(){if(stopping)return;stopping=true;listener.close(async()=>{await db.$disconnect();process.exit(0);});setTimeout(()=>process.exit(1),25000).unref();}
+process.once('SIGTERM',stop);process.once('SIGINT',stop);

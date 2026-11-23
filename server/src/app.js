@@ -14,10 +14,12 @@ import {encodeCost,decodeCost,validateCipher,toPaise,rupees,weightedCost} from '
 import {createSale,createReturn,collectCredit,publicSale,saleInclude} from './sales.js';
 import {report,cashClosing,indiaDay} from './reports.js';
 import {invoicePdf,exportReport} from './documents.js';
-import {backup} from './backup.js';
+import {backup,backupFile} from './backup.js';
 import {stockTransaction} from './stock-operations.js';
 import {catalogue,serializeProduct,productInclude,findBarcode,saveArticle,articleDetails,attachLegacyVariant} from './inventory.js';
 export const app=express();app.disable('x-powered-by');
+// Render terminates HTTPS and forwards the original client address through one proxy.
+if(process.env.TRUST_PROXY==='1')app.set('trust proxy',1);
 app.use('/api',(req,res,next)=>{res.set('Cache-Control','no-store');next();});
 app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"],'img-src':["'self'",'data:','blob:','https:'],'connect-src':["'self'"],'style-src':["'self'","'unsafe-inline'"]}}}));
 app.use(express.json({limit:'12mb'}));
@@ -105,6 +107,10 @@ app.get('/api/closing',owner,route(async(req,res)=>{const opening=z.coerce.numbe
 app.post('/api/closing',owner,route(async(req,res)=>{const d=z.object({day:z.string(),opening:z.number().int().nonnegative(),counted:z.number().int().nonnegative(),note:z.string().max(500)}).parse(req.body);const result=await cashClosing(d.day,d.opening);res.status(201).json(await db.closing.upsert({where:{day:d.day},create:{day:d.day,opening:d.opening,expected:result.expected,counted:d.counted,difference:d.counted-result.expected,note:d.note,actorId:req.user.id},update:{opening:d.opening,expected:result.expected,counted:d.counted,difference:d.counted-result.expected,note:d.note,actorId:req.user.id}}));}));
 app.get('/api/closings',owner,route(async(req,res)=>res.json(await db.closing.findMany({orderBy:{day:'desc'},take:100}))));
 app.post('/api/backups',owner,route(async(req,res)=>res.json({file:await backup()})));
+app.get('/api/backups/:file',owner,route(async(req,res,next)=>{
+ const file=backupFile(req.params.file);
+ res.type('application/octet-stream').download(file,req.params.file,error=>{if(error)next(error);});
+}));
 app.use('/api',(req,res)=>res.status(404).json({error:'API route not found.'}));
 app.use((err,req,res,next)=>{
  if(res.headersSent)return next(err);

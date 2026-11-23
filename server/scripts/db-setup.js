@@ -20,9 +20,12 @@ if(provider==='sqlite'&&process.env.DATABASE_URL.startsWith('file:')){
  if(!existsSync(file)){mkdirSync(path.dirname(file),{recursive:true});writeFileSync(file,'');}
 }
 const commands=[['generate','--schema',target]];
+if(provider==='postgresql'&&!process.argv.includes('--generate-only')&&new URL(process.env.DIRECT_URL||process.env.DATABASE_URL).hostname.includes('-pooler.'))throw new Error('Set DIRECT_URL to the non-pooler PostgreSQL endpoint before running migrations.');
 if(!process.argv.includes('--generate-only'))commands.push(provider==='postgresql'?['migrate','deploy','--schema',target]:['db','push','--schema',target]);
 for(const args of commands) {
- const r=spawnSync(process.execPath,[cli,...args],{stdio:'inherit',env:process.env,cwd:root}); if(r.status!==0)process.exit(r.status||1);
+ // Migrations need a direct connection; application queries keep the pooled URL.
+ const env=provider==='postgresql'&&args[0]==='migrate'&&process.env.DIRECT_URL?{...process.env,DATABASE_URL:process.env.DIRECT_URL}:process.env;
+ const r=spawnSync(process.execPath,[cli,...args],{stdio:'inherit',env,cwd:root}); if(r.status!==0)process.exit(r.status||1);
 }
 
 if(!process.argv.includes('--generate-only')){const r=spawnSync(process.execPath,[path.join(dir,'scripts','backfill-inventory.js')],{cwd:root,env:process.env,stdio:'inherit'});if(r.status!==0)process.exit(r.status||1);}

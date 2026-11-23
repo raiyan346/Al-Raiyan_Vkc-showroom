@@ -3,6 +3,10 @@ import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {db} from './db.js';
 const tables=['user','setting','product','supplier','purchase','purchaseItem','stockMovement','customer','sale','saleItem','return','returnItem','payment','expense','closing','article','barcode','stockOperation','productChange'];
+export function backupFile(name){
+ if(!/^alraiyan-[a-zA-Z0-9T.\-]+\.json$/.test(name))throw new Error('Invalid backup filename.');
+ return path.join(path.resolve(process.env.BACKUP_DIR||'./backups'),name);
+}
 export async function backup(){
  const dir=path.resolve(process.env.BACKUP_DIR||'./backups');await mkdir(dir,{recursive:true});
  const data=await db.$transaction(async tx=>{const result={version:2,createdAt:new Date().toISOString()};for(const model of tables)result[model]=await tx[model].findMany();return result;},{isolationLevel:'Serializable',timeout:60000});
