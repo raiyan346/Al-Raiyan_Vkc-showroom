@@ -23,7 +23,9 @@ Passwords use bcrypt. Login creates a random server-side database session, expir
 
 LocalStorage holds only non-secret user metadata and expiry for offline rendering on an already authenticated shop device. IndexedDB continues holding that user's saved catalogue and pending bills. Offline access ends at the recorded session expiry. Reconnect to renew the CSRF token and sync. Never clear browser storage with pending bills. Logout clears cached private data and is blocked until pending bills sync.
 
-The demo has a fictional shared visitor account with Owner feature permissions for billing, products, stock and reports. Account administration, password changes and backup downloads are forbidden for demo visitors. No maintenance/reset endpoint is exposed. Existing UPI/Card controls only record payment types; there is no payment gateway. WhatsApp/external sharing is disabled in demo mode. Demo PDF, thermal/local receipts and Excel reports are labeled SAMPLE.
+The demo has a fictional shared visitor account with Staff permissions for billing, products, stock and customers. The server caps every demo session at Staff even if an account is accidentally assigned Owner. The cost cipher, purchase prices, cost labels, profit reports, financial exports, daily closings, account administration, password changes and backups are forbidden for demo visitors. Old demo caches are stripped of confidential cost fields without discarding pending bills or drafts. No maintenance/reset endpoint is exposed. Existing UPI/Card controls only record payment types; there is no payment gateway. WhatsApp/external sharing is disabled in demo mode. Demo PDF and thermal/local receipts are labeled SAMPLE.
+
+New production installations generate a private cost cipher in the database. Public examples in the source are fictional development mappings. Existing shop mappings are preserved on deploy; the authenticated Owner can view or change the private mapping in Settings. Never copy a real shop mapping or its data into the demo or source files.
 
 ## Safe database commands
 

@@ -1,5 +1,6 @@
 import {get,set,update} from 'idb-keyval';
 import {calculateBill} from '@alraiyan/core';
+import {withoutDemoSecrets} from './demo-privacy.js';
 export const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format((n||0)/100);
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let csrfToken='';
@@ -17,8 +18,8 @@ export async function api(path,options={}){
 }
 export const post=(path,body)=>api(path,{method:'POST',body:JSON.stringify(body)});
 export const key=id=>`pos:${id}`;
-export const readStore=async id=>(await get(key(id)))||{products:[],customers:[],settings:{shopName:'Al-Raiyan VKC Show Room',address:'Tamil Nadu, India',phone:''},pending:[],receipts:[],held:[],draft:[]};
-export async function mutateStore(id,fn){let result;await update(key(id),state=>result=fn(state||{products:[],customers:[],settings:{},pending:[],receipts:[],held:[],draft:[]}));return result;}
+export async function readStore(id){const initial={products:[],customers:[],settings:{shopName:'Al-Raiyan VKC Show Room',address:'Tamil Nadu, India',phone:''},pending:[],receipts:[],held:[],draft:[]};if(!isDemo)return(await get(key(id)))||initial;let safe;await update(key(id),state=>safe=withoutDemoSecrets(state||initial));return safe;}
+export async function mutateStore(id,fn){let result;await update(key(id),state=>{result=fn(state||{products:[],customers:[],settings:{},pending:[],receipts:[],held:[],draft:[]});return result=isDemo?withoutDemoSecrets(result):result;});return result;}
 export async function cachedRefresh(id){const [products,customers,settings]=await Promise.all([api('/products'),api('/customers'),api('/settings')]);return mutateStore(id,s=>({...s,products,customers,settings,lastSync:new Date().toISOString()}));}
 export async function syncBills(id){
  const run=async()=>{

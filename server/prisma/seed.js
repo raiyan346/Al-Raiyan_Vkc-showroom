@@ -7,11 +7,12 @@ import {randomUUID} from 'node:crypto';
 import {db} from '../src/db.js';
 import {createSale} from '../src/sales.js';
 import {backfillInventory} from '../src/inventory.js';
+import {privateShopCipher} from '../src/security-policy.js';
 async function main(){
  if(appEnv==='development'&&/^postgres(?:ql)?:/.test(process.env.DATABASE_URL||'')&&process.env.SEED_SAMPLE_DATA==='true')throw new Error('PostgreSQL sample seeding requires an explicitly isolated demo environment.');
  await verifyDatabaseIdentity({initialize:true});
  if(appEnv==='demo')return seedDemo();
- await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop'}});
+ await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop',...(appEnv==='production'?{cipher:privateShopCipher()}:{})}});
  const passwords={OWNER:process.env.OWNER_PASSWORD,STAFF:process.env.STAFF_PASSWORD};
  for(const [role,password] of Object.entries(passwords)){
   // Preserve the shop's existing Owner even after the login username is changed.
@@ -35,7 +36,7 @@ async function main(){
   ['Cozy Ladies Slipper','Cozy','Ladies','6','Pink',399,220,22],
   ['Classic Leather Look','Lunar','Shoes','10','Tan',999,650,6]
  ];
- const owner=await db.user.findUniqueOrThrow({where:{username:'owner'}});
+ const owner=await db.user.findUniqueOrThrow({where:{username:process.env.OWNER_USERNAME||'owner'}});
  for(const [n,s] of samples.entries()){
   const [name,brand,category,size,color,mrp,cost,quantity]=s;
   const p=await db.product.create({data:{name,brand,category,size,color,mrp:mrp*100,purchasePrice:cost*100,quantity,barcode:`ARDEMO${String(n+1).padStart(6,'0')}`,...(n===11?{createdAt:new Date(Date.now()-75*86400000)}:{})}});

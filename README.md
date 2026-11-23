@@ -71,7 +71,7 @@ The Owner sees the secret cost code beside MRP in the New Bill cart, along with 
 - For an exchange, record the return, refund/credit adjustment, and create a separate bill for the replacement. They remain separate accounting records.
 - Stock audits replace the system count with the actual counted quantity and retain the difference in history.
 
-Cost code mapping: `0=A, 1=J, 2=I, 3=H, 4=G, 5=F, 6=E, 7=D, 8=C, 9=B`. ₹300 → `HAA`; ₹1,250 → `JIFA`. Decimal prices preserve a dot: ₹12.50 → `JI.FA`. The real cost is always stored as integer paise. Owners can edit the ten unique uppercase letters in Settings. Reprint old labels after a cipher change. Labels use the current weighted cost; **customer receipts, PDFs, and WhatsApp messages omit cost and code**.
+Fictional development mapping example: `0=A, 1=J, 2=I, 3=H, 4=G, 5=F, 6=E, 7=D, 8=C, 9=B`. ₹300 → `HAA`; ₹1,250 → `JIFA`. Decimal prices preserve a dot: ₹12.50 → `JI.FA`. New production shops receive a private random mapping stored in their database; never publish the real mapping. The real cost is always stored as integer paise. Owners can edit the ten unique uppercase letters in Settings. Reprint old labels after a cipher change. Labels use the current weighted cost; **customer receipts, PDFs, and WhatsApp messages omit cost and code**. Public demo visitors cannot retrieve the cipher, cost prices, cost labels or profit reports.
 
 ## Offline billing
 

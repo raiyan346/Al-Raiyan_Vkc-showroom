@@ -12,7 +12,7 @@ export default function App(){
  const [siteDemo,setSiteDemo]=useState(false);
  const [starting,setStarting]=useState(true),[startupError,setStartupError]=useState(''),[startupAttempt,setStartupAttempt]=useState(0);
  const [auth,setAuth]=useState(null),[state,setState]=useState(null),[page,setPage]=useState('home'),[receipt,setReceipt]=useState(null),[lang,setLang]=useState(localStorage.getItem('pos-lang')||'ta'),[dark,setDark]=useState(localStorage.getItem('pos-dark')==='true'),[online,setOnline]=useState(navigator.onLine),[syncing,setSyncing]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[mobile,setMobile]=useState(false),[install,setInstall]=useState(null),[updateReady,setUpdateReady]=useState(false);
- const t=(ta,en)=>lang==='ta'?ta:en;const owner=auth?.user.role==='OWNER';
+ const t=(ta,en)=>lang==='ta'?ta:en;const owner=!auth?.demoMode&&auth?.user.role==='OWNER';
  useEffect(()=>{
   let active=true;setStarting(true);setStartupError('');
   api('/auth/session').then(access=>{

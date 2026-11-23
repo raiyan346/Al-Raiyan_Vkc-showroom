@@ -3,19 +3,20 @@ import bcrypt from 'bcryptjs';
 import {rateLimit} from 'express-rate-limit';
 import {db} from './db.js';
 import {secret,secureCookies,baseUrl,demoMode,sessionHours,appEnv} from './config.js';
+import {sessionIdentity} from './security-policy.js';
 const cookieName=secureCookies?'__Host-vkc_session':'vkc_session';
 const csrfName=secureCookies?'__Host-vkc_csrf':'vkc_csrf';
 const cookieOptions={httpOnly:true,secure:secureCookies,sameSite:'strict',path:'/'};
 const hash=token=>createHmac('sha256',secret).update(token).digest('hex');
 const cookies=req=>Object.fromEntries((req.headers.cookie||'').split(';').map(s=>s.trim().split('=')));
-const publicUser=user=>({id:user.id,name:user.name,role:user.role});
+const publicUser=user=>({id:user.id,name:user.name,role:sessionIdentity(user,demoMode).role});
 function csrf(req,res){let token=cookies(req)[csrfName];if(!/^[a-f0-9]{64}$/.test(token||'')){token=randomBytes(32).toString('hex');res.cookie(csrfName,token,cookieOptions);}return token;}
 async function identity(req){
  const token=cookies(req)[cookieName];if(!/^[a-f0-9]{64}$/.test(token||''))return null;
  const session=await db.session.findUnique({where:{id:hash(token)}});
  if(!session||session.expiresAt<=new Date())return null;
  const user=await db.user.findUnique({where:{id:session.userId}});
- if(user?.active&&user.tokenVersion===session.tokenVersion){req.sessionExpiresAt=session.expiresAt;return user;}return null;
+ if(user?.active&&user.tokenVersion===session.tokenVersion){req.sessionExpiresAt=session.expiresAt;return sessionIdentity(user,demoMode);}return null;
 }
 export function installAuthentication(app,route){
  app.get('/api/config',(_req,res)=>res.json({demoMode,registrationEnabled:false,release:process.env.RENDER_GIT_COMMIT||null}));
