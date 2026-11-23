@@ -5,7 +5,7 @@ export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',
 export function session(){try{return JSON.parse(localStorage.getItem('pos-session'));}catch{return null;}}
 export class ApiError extends Error{constructor(message,status){super(message);this.status=status;}}
 export async function api(path,options={}){
- const s=session();let response;try{response=await fetch('/api'+path,{...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(s?{Authorization:`Bearer ${s.token}`} : {}),...options.headers},signal:AbortSignal.timeout(25000)});}catch{throw new ApiError('Cannot reach the shop server. Your offline bills are safe.',0);}
+ const s=session();let response;try{response=await fetch('/api'+path,{...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(s?.token?{Authorization:`Bearer ${s.token}`} : {}),...options.headers},signal:AbortSignal.timeout(25000)});}catch{throw new ApiError('Cannot reach the shop server. Your offline bills are safe.',0);}
  if(!response.ok){let data;try{data=await response.json();}catch{data={};}throw new ApiError(data.error||'Request failed. Please try again.',response.status);}
  return response.headers.get('content-type')?.includes('json')?response.json():response.blob();
 }

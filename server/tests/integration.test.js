@@ -14,6 +14,7 @@ const dir=mkdtempSync(path.join(testRoot,'alraiyan-test-'));
 writeFileSync(path.join(dir,'test.db'),'');
 process.env.DATABASE_URL=`file:${path.join(dir,'test.db').replaceAll('\\','/')}`;
 process.env.JWT_SECRET='integration-test-secret-at-least-32-characters';
+process.env.PUBLIC_ACCESS='false';
 const cli=fileURLToPath(new URL('../../node_modules/prisma/build/index.js',import.meta.url));
 const setup=spawnSync(process.execPath,[cli,'db','push','--schema',path.join(serverDir,'prisma/schema.prisma'),'--skip-generate'],{cwd:path.resolve(serverDir,'..'),env:{...process.env,RUST_LOG:'info'},encoding:'utf8'});
 if(setup.status!==0)throw new Error(setup.stdout+setup.stderr);
@@ -33,6 +34,7 @@ before(async()=>{
 });
 after(async()=>{await db.$disconnect();const resolved=path.resolve(dir);if(resolved.startsWith(path.resolve(testRoot)+path.sep)&&path.basename(resolved).startsWith('alraiyan-test-'))rmSync(resolved,{recursive:true,force:true});});
 test('authentication, role checks and cost confidentiality across product/settings/sale routes',async()=>{
+ assert.deepEqual((await request(app).get('/api/auth/session')).body,{publicAccess:false});
  assert.equal((await request(app).get('/api/products')).status,401);
  for(const route of ['/api/reports','/api/users'])assert.equal((await request(app).get(route).set(auth(staffToken))).status,403);
  const products=(await request(app).get('/api/products').set(auth(staffToken))).body;

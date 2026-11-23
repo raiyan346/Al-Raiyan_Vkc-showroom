@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+
+test('shop opens without sign-in, keeps offline billing available, and omits account controls',async({page,context})=>{
+ test.skip(process.env.PUBLIC_ACCESS!=='true','Run with PUBLIC_ACCESS=true.');
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.addInitScript(()=>localStorage.setItem('pos-lang','en'));
+ await page.goto('/');
+ await expect(page.locator('.home-tile')).toHaveCount(6);
+ await expect(page.locator('.login-card')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Sign out'})).toHaveCount(0);
+ const session=await page.evaluate(()=>JSON.parse(localStorage.getItem('pos-session')));
+ expect(session.publicAccess).toBe(true);expect(session.token).toBeUndefined();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await expect(page.getByText('Secret cost cipher')).toBeVisible();
+ await expect(page.getByText('Owner / Staff accounts',{exact:true})).toHaveCount(0);
+ await expect(page.locator('input[type="password"]')).toHaveCount(0);
+ await page.evaluate(()=>navigator.serviceWorker.ready);
+ await page.reload();
+ await expect(page.locator('.app-shell')).toBeVisible();
+ await context.setOffline(true);
+ await page.reload();
+ await expect(page.locator('.home-tile')).toHaveCount(6);
+ await expect(page.locator('.login-card')).toHaveCount(0);
+ await page.locator('.home-tile.blue').click();
+ await expect(page.getByRole('textbox',{name:'Scan barcode or type product name…'})).toBeVisible();
+ await context.setOffline(false);
+ await page.reload();
+ await expect(page.locator('.home-tile')).toHaveCount(6);
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+});

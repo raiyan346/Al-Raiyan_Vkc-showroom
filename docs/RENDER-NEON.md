@@ -24,15 +24,18 @@ Set these server environment variables in Render. Never commit their real values
 | `STAFF_PASSWORD` | Different initial staff password, at least 10 characters |
 | `SEED_SAMPLE_DATA` | `false` |
 | `TRUST_PROXY` | `1` |
+| `PUBLIC_ACCESS` | `true` to open the shop without sign-in; anyone with the URL can use Owner features |
 | `BACKUP_DIR` | `/tmp/alraiyan-backups` for Free; use a persistent mount for a paid disk |
 
-Let Render supply `PORT`. Initial usernames are `owner` and `staff`. Change passwords in the app's Settings after signing in. Seeding creates missing accounts/settings and preserves existing users, products, and bills.
+Let Render supply `PORT`. This hosted shop uses `PUBLIC_ACCESS=true` at the owner's request: the dashboard opens directly and all shop operations use the existing Owner identity. No password or bearer token is sent to browsers. Account/password controls and sign-out are hidden in this mode. Anyone who can reach the URL can view and change shop records and download backups.
+
+Set `PUBLIC_ACCESS=false` to require sign-in. Initial usernames are `owner` and `staff`; use Settings to change passwords. Seeding creates missing accounts/settings and preserves existing users, products, and bills in either mode.
 
 Startup applies committed PostgreSQL migrations through `DIRECT_URL`, then seeds accounts before accepting traffic. The application's runtime database queries use `DATABASE_URL` and its pooled connection. Builds only generate the Prisma client; they do not migrate the database.
 
 ## Verify a deployment
 
-Wait for Render's specific deployment to become `live`, then verify HTTPS, `/api/health`, both account roles, products, reports, and the PWA assets. Test mutations against a separate Neon branch to keep production free of test stock and bills. Ensure unauthenticated API requests fail and Staff cannot access Owner reports or backups.
+Wait for Render's specific deployment to become `live`, then verify HTTPS, `/api/health`, products, reports, and the PWA assets. With public access enabled, verify a fresh browser opens the dashboard without a login form and ordinary shop APIs work without a bearer token. With sign-in required, verify both account roles, unauthenticated API requests failing, and Staff being unable to access Owner reports or backups. Test mutations against a separate Neon branch to keep production free of test stock and bills.
 
 ## Free hosting and backups
 

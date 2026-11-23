@@ -4,4 +4,5 @@ dotenv.config({path:fileURLToPath(new URL('../../.env',import.meta.url))});
 if(process.env.NODE_ENV==='production'&&process.env.DB_PROVIDER==='postgresql'&&!/^postgres(?:ql)?:\/\//.test(process.env.DATABASE_URL||''))throw new Error('Set DATABASE_URL to the production PostgreSQL connection string.');
 process.env.DATABASE_URL ||= 'file:./dev.db';
 export const secret=process.env.JWT_SECRET;
+export const publicAccess=process.env.PUBLIC_ACCESS==='true';
 if(!secret || secret.length<32 || secret.startsWith('replace-')) throw new Error('Set JWT_SECRET in .env to at least 32 random characters.');
