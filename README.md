@@ -2,6 +2,8 @@
 
 A working React + Express + Prisma showroom POS, using the supplied Stitch screens and showroom logo. Tamil is the default, with English switching, large controls, light/dark themes, and a responsive layout. **GST is deliberately absent**, as requested.
 
+The article/size inventory upgrade and phone-scanner guide is in [docs/FOOTWEAR-INVENTORY.md](docs/FOOTWEAR-INVENTORY.md).
+
 ## Start on this Windows computer
 
 Node.js 22 is required. The project already has a local `.env` and sample SQLite database created during development. If starting from a fresh copy, follow the next section first.
@@ -150,7 +152,7 @@ npm.cmd run test:browser
 
 Core tests cover cipher examples/custom mappings/invalid data, money validation, negotiated-price profit, discount allocation, exact partial returns, weighted costs, and keyboard scanner behavior. Integration tests use a separate disposable SQLite database and cover authorization, confidential fields, atomic/idempotent sales, last-pair concurrency, credit/returns, stock, imports, PDFs, and report reconciliation. They do not touch the seeded development database. Browser tests use another isolated database and installed Chrome (`PLAYWRIGHT_CHANNEL=msedge` can select Edge).
 
-Browser scenarios check Tamil-first sign-in, the six Stitch home tiles, mobile layout/dark mode, keyboard barcode checkout with negotiated pricing, receipt confidentiality, offline reload/queue/reconnect, and Staff permissions. Screenshots are saved in `.artifacts/`; failure traces go in `test-results/`. Hardware printing and live phone camera/voice recognition require manual verification. PostgreSQL container integration needs Docker on the target machine.
+Browser scenarios check Tamil-first sign-in, the six Stitch home tiles, mobile layout/dark mode, keyboard barcode checkout with negotiated pricing, receipt confidentiality, offline reload/queue/reconnect, and Staff permissions. Screenshots are saved in `.artifacts/`; failure traces go in `test-results/`. Hardware printing and real Android/iPhone camera focus, torch, and voice recognition require manual verification. HTTPS browser tests exercise camera-denial recovery, track cleanup, rear-camera constraints, and genuine image decoding. PostgreSQL container integration needs Docker on the target machine.
 
 Tamil text uses a bundled Noto Sans Tamil font for offline display and PDFs. Its SIL Open Font License is included at `client/public/fonts/OFL.txt`.
 
@@ -160,7 +162,10 @@ Tamil text uses a bundled Noto Sans Tamil font for offline display and PDFs. Its
 client/                     React + Vite + Tailwind PWA
   src/App.jsx               Login, shell, home tiles, shared state
   src/Billing.jsx           Scanner/cart, holds, receipts, returns
-  src/Inventory.jsx         Products/import, labels, stock, suppliers
+  src/Products.jsx          Articles, size variants, manufacturer barcodes
+  src/CameraScanner.jsx     Rear camera, torch, images, manual scanning
+  src/VariantPicker.jsx     Shared-barcode size/colour selection
+  src/Inventory.jsx         Import, labels, stock, suppliers
   src/Management.jsx        Reports, expenses, customers, settings
   src/lib.js                API, IndexedDB queue, sync, receipts
   public/                   Showroom logo, icons, sample CSV

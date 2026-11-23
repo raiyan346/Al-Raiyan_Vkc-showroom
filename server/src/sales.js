@@ -28,16 +28,16 @@ export async function createSale(input,user) {
   if(soldTime>new Date(Date.now()+5*60*1000))throw new Error('Bill time is in the future. Check device clock.');
   const lines=[];
   for(const i of data.items){
-   const p=await tx.product.findUnique({where:{id:i.productId}});
+   const p=await tx.product.findUnique({where:{id:i.productId},include:{article:true}});
    if(!p?.active)throw new Error('A product is no longer available.');
    const changed=await tx.product.updateMany({where:{id:p.id,quantity:{gte:i.quantity},active:true},data:{quantity:{decrement:i.quantity}}});
    if(changed.count!==1)throw new Error(`Not enough stock: ${p.name} / ${p.size}. Review this bill before retrying.`);
-   lines.push({...i,name:p.name,size:p.size,color:p.color,barcode:p.barcode,mrp:p.mrp,unitCost:p.purchasePrice,costKnown:p.costKnown});
+   lines.push({...i,brandSnapshot:p.brand,articleSnapshot:p.article?.articleNumber||'',name:p.name,size:p.size,color:p.color,barcode:p.barcode,mrp:p.mrp,unitCost:p.purchasePrice,costKnown:p.costKnown});
    await tx.stockMovement.create({data:{productId:p.id,delta:-i.quantity,kind:'SALE',note:data.id,actorId:user.id}});
   }
   const bill=calculateBill(lines,data.discount);
   if(data.paymentMode==='CASH'&&data.cashTendered<bill.total)throw new Error('Cash received is less than the bill total.');
-  return tx.sale.create({data:{id:data.id,number:`AR-${new Date().toISOString().slice(0,10).replaceAll('-','')}-${data.id.slice(0,8).toUpperCase()}`,requestHash:hash,userId:user.id,customerId:data.customerId||null,paymentMode:data.paymentMode,subtotal:bill.subtotal,discount:bill.discount,total:bill.total,cost:bill.cost,profit:bill.profit,cashTendered:data.paymentMode==='CASH'?data.cashTendered:0,creditDue:data.paymentMode==='CREDIT'?bill.total:0,soldAt:soldTime,items:{create:bill.lines.map(({gross,cost,productId,quantity,unitPrice,name,size,color,barcode,mrp,unitCost,costKnown,discount,net})=>({productId,quantity,unitPrice,name,size,color,barcode,mrp,unitCost,costKnown,discount,net}))}},include:saleInclude});
+  return tx.sale.create({data:{id:data.id,number:`AR-${new Date().toISOString().slice(0,10).replaceAll('-','')}-${data.id.slice(0,8).toUpperCase()}`,requestHash:hash,userId:user.id,customerId:data.customerId||null,paymentMode:data.paymentMode,subtotal:bill.subtotal,discount:bill.discount,total:bill.total,cost:bill.cost,profit:bill.profit,cashTendered:data.paymentMode==='CASH'?data.cashTendered:0,creditDue:data.paymentMode==='CREDIT'?bill.total:0,soldAt:soldTime,items:{create:bill.lines.map(({gross,cost,brandSnapshot,articleSnapshot,productId,quantity,unitPrice,name,size,color,barcode,mrp,unitCost,costKnown,discount,net})=>({brandSnapshot,articleSnapshot,productId,quantity,unitPrice,name,size,color,barcode,mrp,unitCost,costKnown,discount,net}))}},include:saleInclude});
  });
  try{return await run();}catch(e){
   if(e.code==='P2002'){

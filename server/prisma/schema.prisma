@@ -23,6 +23,26 @@ model Setting {
   phone String @default("")
   cipher String @default("AJIHGFEDCB")
   lowStock Int @default(5)
+  sizeSystems String @default("UK/India,EU,US,Alpha,Custom")
+}
+model Article {
+  id String @id @default(uuid())
+  identityKey String @unique
+  articleNumber String
+  brand String
+  name String
+  category String
+  gender String @default("Unisex")
+  sizeSystem String @default("UK/India")
+  image String?
+  notes String @default("")
+  supplierId String?
+  supplier Supplier? @relation(fields:[supplierId],references:[id])
+  variants Product[]
+  barcodes Barcode[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([brand,articleNumber])
 }
 model Product {
   id String @id @default(uuid())
@@ -36,6 +56,12 @@ model Product {
   costKnown Boolean @default(true)
   quantity Int @default(0)
   barcode String @unique
+  internalSku String? @unique
+  articleId String?
+  article Article? @relation(fields:[articleId],references:[id])
+  sellingPrice Int?
+  minimumStock Int?
+  barcodes Barcode[]
   photo String?
   active Boolean @default(true)
   createdAt DateTime @default(now())
@@ -44,6 +70,37 @@ model Product {
   movements StockMovement[]
   purchases PurchaseItem[]
   @@index([active,name])
+  @@unique([articleId,size,color])
+}
+model Barcode {
+  id String @id @default(uuid())
+  value String
+  format String
+  type String
+  targetKey String @unique
+  articleId String
+  article Article @relation(fields:[articleId],references:[id])
+  variantId String?
+  variant Product? @relation(fields:[variantId],references:[id])
+  createdAt DateTime @default(now())
+  @@index([value])
+  @@index([articleId])
+  @@index([variantId])
+}
+model StockOperation {
+  id String @id
+  requestHash String
+  actorId String
+  result String
+  createdAt DateTime @default(now())
+}
+model ProductChange {
+  id String @id @default(uuid())
+  productId String
+  actorId String
+  action String
+  createdAt DateTime @default(now())
+  @@index([productId,createdAt])
 }
 model Supplier {
   id String @id @default(uuid())
@@ -51,6 +108,7 @@ model Supplier {
   phone String @default("")
   address String @default("")
   purchases Purchase[]
+  articles Article[]
 }
 model Purchase {
   id String @id @default(uuid())
@@ -77,6 +135,7 @@ model StockMovement {
   delta Int
   kind String
   note String @default("")
+  referenceId String?
   actorId String
   createdAt DateTime @default(now())
   @@index([productId,createdAt])
@@ -119,6 +178,8 @@ model SaleItem {
   productId String
   product Product @relation(fields:[productId],references:[id])
   name String
+  brandSnapshot String @default("")
+  articleSnapshot String @default("")
   size String
   color String
   barcode String

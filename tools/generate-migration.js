@@ -1,5 +1,6 @@
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
+if(existsSync('server/prisma/postgresql/migrations/202611150001_article_inventory'))throw new Error('Initial migration is immutable after the inventory upgrade. Add a new migration instead.');
 const schema='server/prisma/postgresql/schema.prisma';
 mkdirSync('server/prisma/postgresql/migrations/202611140001_initial',{recursive:true});
 writeFileSync(schema,readFileSync('server/prisma/schema.prisma','utf8').replace('provider = "sqlite"','provider = "postgresql"'));

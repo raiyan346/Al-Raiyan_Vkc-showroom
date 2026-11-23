@@ -24,3 +24,5 @@ if(!process.argv.includes('--generate-only'))commands.push(provider==='postgresq
 for(const args of commands) {
  const r=spawnSync(process.execPath,[cli,...args],{stdio:'inherit',env:process.env,cwd:root}); if(r.status!==0)process.exit(r.status||1);
 }
+
+if(!process.argv.includes('--generate-only')){const r=spawnSync(process.execPath,[path.join(dir,'scripts','backfill-inventory.js')],{cwd:root,env:process.env,stdio:'inherit'});if(r.status!==0)process.exit(r.status||1);}

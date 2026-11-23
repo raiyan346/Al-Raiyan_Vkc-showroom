@@ -115,10 +115,63 @@ test('stock receipts and returns use weighted costs while existing bill cost rem
  const updated=await db.product.findUnique({where:{id:p.id}});assert.equal(updated.purchasePrice,Math.round((before.quantity*before.purchasePrice+25000)/(before.quantity+1)));
  const changed=await request(app).post(`/api/sales/${sale.body.id}/returns`).set(auth(ownerToken)).send({...data,reason:'Different reason'});assert.equal(changed.status,400);
 });
+
+let footwear;
+const articleInput=()=>({id:randomUUID(),brand:'Walkaroo',articleNumber:'W5687',name:'Walkaroo Daily Sandal',category:"Men's Sandals",gender:'Men',sizeSystem:'UK/India',notes:'Real manufacturer details entered by shop',barcodes:[{value:'W5687-SHARED',format:'CODE128',type:'MANUFACTURER'}],variants:[6,7,8,9,10,11,12].map(size=>({size:String(size),color:'BLACK',mrp:59900,sellingPrice:45000,purchasePrice:30000,quantity:5,minimumStock:2,barcodes:[{value:'W5687-'+size,format:'CODE128',type:'MANUFACTURER'},...(size===9?[{value:'0036000291452',format:'EAN13',type:'ALIAS'}]:[])]}))});
+test('article W5687 persists seven sizes, unique internal SKUs and real/shared manufacturer mappings',async()=>{
+ const input=articleInput();const a=await request(app).post('/api/articles').set(auth(ownerToken)).send(input);assert.equal(a.status,201,JSON.stringify(a.body));
+ const repeat=await request(app).post('/api/articles').set(auth(ownerToken)).send(input);assert.equal(repeat.body.id,a.body.id);
+ const detail=await request(app).get('/api/articles/'+a.body.id).set(auth(ownerToken));assert.equal(detail.status,200);footwear=detail.body;
+ assert.equal(footwear.variants.length,7);assert.equal(new Set(footwear.variants.map(v=>v.internalSku)).size,7);assert.equal(footwear.variants.reduce((s,v)=>s+v.quantity,0),35);
+ const duplicate=await request(app).post('/api/articles').set(auth(ownerToken)).send({...input,id:randomUUID()});assert.equal(duplicate.status,400);
+ assert.equal(await db.article.count({where:{articleNumber:'W5687'}}),1);
+});
+test('barcode endpoint resolves exact sizes, aliases with leading zeros, shared choices and unknown codes',async()=>{
+ for(const [code,size] of [['W5687-6','6'],['W5687-9','9'],['036000291452','9'],['0036000291452','9']]){
+  const r=await request(app).get('/api/barcodes/resolve').query({value:code}).set(auth(staffToken));assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.status,'UNIQUE');assert.equal(r.body.variants[0].size,size);assert.equal(r.body.variants[0].purchasePrice,undefined);
+ }
+ const shared=await request(app).get('/api/barcodes/resolve').query({value:'W5687-SHARED'}).set(auth(ownerToken));assert.equal(shared.body.status,'CHOOSE_VARIANT');assert.equal(shared.body.variants.length,7);
+ const unknown=await request(app).get('/api/barcodes/resolve?value=NEVER-REGISTERED').set(auth(ownerToken));assert.equal(unknown.body.status,'UNKNOWN');
+});
+test('receive size 8 exactly once, sell size 9 exactly once and restore its original-cost return',async()=>{
+ const eight=footwear.variants.find(v=>v.size==='8'),nine=footwear.variants.find(v=>v.size==='9');
+ const stock={id:randomUUID(),reference:'Supplier entry W5687',items:[{productId:eight.id,quantity:2,unitCost:40000}]};
+ for(let i=0;i<2;i++){const r=await request(app).post('/api/stock/in').set(auth(ownerToken)).send(stock);assert.equal(r.status,201,JSON.stringify(r.body));}
+ assert.equal((await db.product.findUnique({where:{id:eight.id}})).quantity,7);assert.equal((await db.product.findUnique({where:{id:nine.id}})).quantity,5);
+ assert.equal(await db.stockMovement.count({where:{referenceId:stock.id}}),1);
+ const input=payload(nine,{items:[{productId:nine.id,quantity:1,unitPrice:45000}],discount:1000});
+ const sale=await request(app).post('/api/sales').set(auth(ownerToken)).send(input);assert.equal(sale.status,201,JSON.stringify(sale.body));await request(app).post('/api/sales').set(auth(ownerToken)).send(input);
+ assert.equal(sale.body.cost,30000);assert.equal(sale.body.profit,14000);assert.equal(sale.body.items[0].brandSnapshot,'Walkaroo');assert.equal(sale.body.items[0].articleSnapshot,'W5687');
+ assert.equal((await db.product.findUnique({where:{id:nine.id}})).quantity,4);assert.equal((await db.product.findUnique({where:{id:eight.id}})).quantity,7);
+ const ret=await request(app).post('/api/sales/'+sale.body.id+'/returns').set(auth(ownerToken)).send({id:randomUUID(),reason:'Size return',refundMode:'CASH',items:[{saleItemId:sale.body.items[0].id,quantity:1}]});assert.equal(ret.status,201);assert.equal((await db.product.findUnique({where:{id:nine.id}})).quantity,5);
+ const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());const r=await request(app).get('/api/reports').query({from:day,to:day}).set(auth(ownerToken));assert.equal(r.body.netProfit,r.body.sales-r.body.cost-r.body.expenses);assert.equal(r.body.profitByArticle.find(a=>a.name==='Walkaroo / W5687').profit,0);
+});
+test('missing sizes and non-numeric sizes can be added without rewriting existing stock or historical bills',async()=>{
+ const article=await db.article.findUnique({where:{id:footwear.id}});
+ const input={...articleInput(),articleId:footwear.id,variants:[{size:'XL',color:'BLUE',mrp:69900,sellingPrice:60000,purchasePrice:35000,quantity:3,minimumStock:1}]};
+ const r=await request(app).post('/api/articles').set(auth(ownerToken)).send(input);assert.equal(r.status,201,JSON.stringify(r.body));
+ const detail=(await request(app).get('/api/articles/'+footwear.id).set(auth(ownerToken))).body;assert.equal(detail.variants.length,8);assert.equal(detail.variants.find(v=>v.size==='XL').quantity,3);
+ const bad={...input,id:randomUUID(),variants:[{...input.variants[0],size:'S',barcodes:[{value:'4006381333932',format:'EAN13'}]}]};assert.equal((await request(app).post('/api/articles').set(auth(ownerToken)).send(bad)).status,400);assert.equal(await db.product.count({where:{articleId:footwear.id}}),8);
+});
+test('supplier returns and audited adjustments are transactional, idempotent and never make stock negative',async()=>{
+ const nine=footwear.variants.find(v=>v.size==='9');const body={id:randomUUID(),productId:nine.id,kind:'SUPPLIER_RETURN',quantity:1,note:'Returned damaged pair to supplier'};
+ for(let i=0;i<2;i++)assert.equal((await request(app).post('/api/stock/adjust').set(auth(staffToken)).send(body)).status,200);
+ assert.equal((await db.product.findUnique({where:{id:nine.id}})).quantity,4);assert.equal(await db.stockMovement.count({where:{referenceId:body.id}}),1);
+ assert.equal((await request(app).post('/api/stock/adjust').set(auth(ownerToken)).send({...body,id:randomUUID(),quantity:99})).status,400);assert.equal((await db.product.findUnique({where:{id:nine.id}})).quantity,4);
+});
+
+test('linking legacy stock preserves variant ID, quantity, cost, barcode and historical bill snapshots',async()=>{
+ const legacy=(await request(app).post('/api/products').set(auth(ownerToken)).send({name:'Old sandal',brand:'Walkaroo',category:'Sandals',size:'S',color:'Red',mrp:40000,purchasePrice:25000,quantity:4})).body;
+ const sold=await request(app).post('/api/sales').set(auth(ownerToken)).send(payload(legacy,{items:[{productId:legacy.id,quantity:1,unitPrice:35000}],discount:0}));assert.equal(sold.status,201);
+ const before=await db.product.findUnique({where:{id:legacy.id}});
+ const linked=await request(app).post('/api/articles/'+footwear.id+'/attach-variant').set(auth(ownerToken)).send({variantId:legacy.id});assert.equal(linked.status,200,JSON.stringify(linked.body));
+ const after=await db.product.findUnique({where:{id:legacy.id}});assert.equal(after.articleId,footwear.id);for(const key of ['id','quantity','purchasePrice','barcode','mrp'])assert.equal(after[key],before[key]);
+ const history=await db.saleItem.findUnique({where:{id:sold.body.items[0].id}});assert.equal(history.name,'Old sandal');assert.equal(history.articleSnapshot,'');assert.equal(history.unitCost,25000);
+});
 test('backup restores all records atomically into an empty database and refuses overwrite',async()=>{
  process.env.BACKUP_DIR=path.join(dir,'backups');
  const {backup}=await import('../src/backup.js');const name=await backup();const filename=path.join(dir,'backups',name);const snapshot=JSON.parse(readFileSync(filename,'utf8'));
- assert.equal(snapshot.version,1);assert.equal(snapshot.sale.length,await db.sale.count());
+ assert.equal(snapshot.version,2);assert.equal(snapshot.sale.length,await db.sale.count());
  const restoredFile=path.join(dir,'restored.db');writeFileSync(restoredFile,'');
  const env={...process.env,DATABASE_URL:`file:${restoredFile.replaceAll('\\','/')}`};
  const root=path.resolve(serverDir,'..');

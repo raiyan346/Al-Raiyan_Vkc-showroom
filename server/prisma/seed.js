@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import {randomUUID} from 'node:crypto';
 import {db} from '../src/db.js';
 import {createSale} from '../src/sales.js';
+import {backfillInventory} from '../src/inventory.js';
 async function main(){
  await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop'}});
  const passwords={OWNER:process.env.OWNER_PASSWORD,STAFF:process.env.STAFF_PASSWORD};
@@ -11,7 +12,7 @@ async function main(){
   if(!password||password.length<10||password.startsWith('choose-'))throw new Error(`Set ${role}_PASSWORD in .env to at least 10 characters before seeding.`);
   await db.user.create({data:{username,name:role==='OWNER'?'Shop Owner':'Shop Staff',role,passwordHash:await bcrypt.hash(password,12)}});
  }
- if(process.env.SEED_SAMPLE_DATA!=='true'||await db.product.count()){console.log('Accounts and settings ready. Existing records preserved.');return;}
+ if(process.env.SEED_SAMPLE_DATA!=='true'||await db.product.count()){await backfillInventory();console.log('Accounts and settings ready. Existing records preserved.');return;}
  const samples=[
   ['VKC Gents Comfort Sandal','VKC','Sandals','8','Brown',599,300,24],
   ['VKC Gents Comfort Sandal','VKC','Sandals','9','Brown',599,300,18],
@@ -37,6 +38,7 @@ async function main(){
  const products=await db.product.findMany({orderBy:{barcode:'asc'}});
  for(const [i,mode] of ['CASH','UPI','CREDIT'].entries())await createSale({id:randomUUID(),items:[{productId:products[i].id,quantity:i+1,unitPrice:products[i].mrp-5000}],discount:i===0?1000:0,paymentMode:mode,cashTendered:mode==='CASH'?100000:0,customerId:mode==='CREDIT'?customer.id:null,soldAt:new Date().toISOString()},owner);
  await db.expense.create({data:{category:'Tea & Snacks',note:'Sample expense',amount:15000,actorId:owner.id}});
+ await backfillInventory();
  console.log('Seeded 12 product variants, 3 sample bills, a customer, supplier, and an expense. Sample barcodes: ARDEMO000001 through ARDEMO000012.');
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;}).finally(()=>db.$disconnect());

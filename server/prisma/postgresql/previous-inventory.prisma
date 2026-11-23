@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(uuid())
+  name String
+  username String @unique
+  passwordHash String
+  role String @default("STAFF")
+  active Boolean @default(true)
+  tokenVersion Int @default(0)
+  sales Sale[]
+  createdAt DateTime @default(now())
+}
+model Setting {
+  id String @id @default("shop")
+  shopName String @default("Al-Raiyan VKC Show Room")
+  address String @default("Tamil Nadu, India")
+  phone String @default("")
+  cipher String @default("AJIHGFEDCB")
+  lowStock Int @default(5)
+}
+model Product {
+  id String @id @default(uuid())
+  name String
+  brand String
+  category String
+  size String
+  color String
+  mrp Int
+  purchasePrice Int
+  costKnown Boolean @default(true)
+  quantity Int @default(0)
+  barcode String @unique
+  photo String?
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  saleItems SaleItem[]
+  movements StockMovement[]
+  purchases PurchaseItem[]
+  @@index([active,name])
+}
+model Supplier {
+  id String @id @default(uuid())
+  name String
+  phone String @default("")
+  address String @default("")
+  purchases Purchase[]
+}
+model Purchase {
+  id String @id @default(uuid())
+  supplierId String?
+  supplier Supplier? @relation(fields:[supplierId],references:[id])
+  reference String @default("")
+  total Int
+  createdAt DateTime @default(now())
+  items PurchaseItem[]
+}
+model PurchaseItem {
+  id String @id @default(uuid())
+  purchaseId String
+  purchase Purchase @relation(fields:[purchaseId],references:[id])
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  quantity Int
+  unitCost Int
+}
+model StockMovement {
+  id String @id @default(uuid())
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  delta Int
+  kind String
+  note String @default("")
+  actorId String
+  createdAt DateTime @default(now())
+  @@index([productId,createdAt])
+}
+model Customer {
+  id String @id @default(uuid())
+  name String
+  phone String @unique
+  sales Sale[]
+  payments Payment[]
+  createdAt DateTime @default(now())
+}
+model Sale {
+  id String @id
+  number String @unique
+  requestHash String
+  userId String
+  user User @relation(fields:[userId],references:[id])
+  customerId String?
+  customer Customer? @relation(fields:[customerId],references:[id])
+  paymentMode String
+  subtotal Int
+  discount Int
+  total Int
+  cost Int
+  profit Int
+  cashTendered Int @default(0)
+  creditDue Int @default(0)
+  createdAt DateTime @default(now())
+  soldAt DateTime
+  items SaleItem[]
+  returns Return[]
+  payments Payment[]
+  @@index([createdAt])
+}
+model SaleItem {
+  id String @id @default(uuid())
+  saleId String
+  sale Sale @relation(fields:[saleId],references:[id])
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  name String
+  size String
+  color String
+  barcode String
+  quantity Int
+  returned Int @default(0)
+  unitPrice Int
+  mrp Int
+  unitCost Int
+  discount Int
+  costKnown Boolean @default(true)
+  net Int
+  returnItems ReturnItem[]
+}
+model Return {
+  id String @id
+  requestHash String
+  saleId String
+  sale Sale @relation(fields:[saleId],references:[id])
+  reason String
+  total Int
+  cost Int
+  creditReduction Int
+  refund Int
+  refundMode String
+  actorId String
+  createdAt DateTime @default(now())
+  items ReturnItem[]
+}
+model ReturnItem {
+  id String @id @default(uuid())
+  returnId String
+  return Return @relation(fields:[returnId],references:[id])
+  saleItemId String
+  saleItem SaleItem @relation(fields:[saleItemId],references:[id])
+  quantity Int
+  amount Int
+}
+model Payment {
+  id String @id
+  customerId String
+  customer Customer @relation(fields:[customerId],references:[id])
+  saleId String
+  sale Sale @relation(fields:[saleId],references:[id])
+  amount Int
+  mode String
+  createdAt DateTime @default(now())
+}
+model Expense {
+  id String @id @default(uuid())
+  category String
+  note String
+  amount Int
+  date DateTime @default(now())
+  actorId String
+  createdAt DateTime @default(now())
+}
+model Closing {
+  id String @id @default(uuid())
+  day String @unique
+  opening Int
+  expected Int
+  counted Int
+  difference Int
+  note String
+  actorId String
+  createdAt DateTime @default(now())
+}

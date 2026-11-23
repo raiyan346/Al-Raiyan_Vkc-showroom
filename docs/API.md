@@ -89,3 +89,8 @@ Only purchased, not-yet-returned quantities are valid. The discounted line value
 Staff sales, histories and products omit purchase costs, profits, cipher and request hashes. Customer receipt generators use explicit selling fields and never the whole product/sale object. Owner report/label/settings/user/backup checks are enforced server-side.
 
 Validation/business errors: 400. Missing/expired/disabled sessions: 401. Owner-only access: 403. Missing record: 404. Unique conflicts: 409. Unexpected database failure: 500. Clients must retain unsynced bills on network failures or rejected stock validation and offer deliberate retry/review.
+
+
+## Article inventory extension
+
+See [Footwear inventory](FOOTWEAR-INVENTORY.md) for article and barcode contracts, stock-operation retry IDs, shared barcode selection, legacy linking, and snapshot-based profit dimensions. `Product` remains the variant entity; `Product.barcode` is an internal Code128, while manufacturer and shared mappings live in `Barcode` without a global unique value constraint.

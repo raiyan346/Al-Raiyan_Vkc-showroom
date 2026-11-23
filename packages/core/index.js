@@ -1,4 +1,6 @@
 export const DEFAULT_CIPHER = 'AJIHGFEDCB';
+export {validateBarcode,normalizeFormat,barcodeKeys,resolveBarcode,addVariantToCart,BARCODE_FORMATS} from './barcodes.js';
+import {resolveBarcode,addVariantToCart} from './barcodes.js';
 export function validateCipher(cipher) {
   if (typeof cipher !== 'string' || !/^[A-Z]{10}$/.test(cipher) || new Set(cipher).size !== 10) throw new Error('Use ten different uppercase letters for digits 0–9.');
   return cipher;
@@ -66,9 +68,8 @@ export function weightedCost(oldQuantity,oldCost,inQuantity,inCost){
  return Number((value+quantity/2n)/quantity);
 }
 export function scanProduct(products, barcode, cart) {
-  const product = products.find(p=>p.barcode === barcode.trim() && p.active !== false);
-  if (!product) throw new Error('Barcode not found. Search for the product.');
-  const old = cart.find(i=>i.productId === product.id);
-  if ((old?.quantity || 0) >= product.quantity) throw new Error('No more stock available.');
-  return old ? cart.map(i=>i.productId === product.id ? {...i,quantity:i.quantity+1} : i) : [...cart,{productId:product.id, name:product.name,size:product.size,color:product.color,barcode:product.barcode,mrp:product.mrp,unitPrice:product.mrp,quantity:1,...(product.purchasePrice !== undefined ? {unitCost:product.purchasePrice}: {})}];
+  const matches=resolveBarcode(products,barcode);
+  if(!matches.length) throw new Error('Barcode not found. Search for the product.');
+  if(matches.length>1) throw new Error('Shared barcode: choose a size and colour.');
+  return addVariantToCart(matches[0],cart);
 }
