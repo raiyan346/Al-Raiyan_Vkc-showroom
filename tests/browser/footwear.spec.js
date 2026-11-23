@@ -1,10 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {mkdirSync} from 'node:fs';
-async function login(page,request){
-  const r=await request.post('/api/auth/login',{data:{username:'owner',password:'browser-owner-123'}});const auth=await r.json();
-  await page.addInitScript(a=>{localStorage.setItem('pos-session',JSON.stringify(a));localStorage.setItem('pos-lang','en');},auth);
-  return auth;
-}
+import {browserLogin as login} from './auth-helper.js';
+
 test('article form creates W5687 sizes 6-12; shared scans require selection and repeat scans increase one size',async({page,request})=>{
   await login(page,request);await page.goto('/');await page.locator('.home-tile.amber').click();await page.getByRole('button',{name:'Add product',exact:true}).click();
   let dialog=page.getByRole('dialog');await dialog.getByLabel(/Article number/).fill('W5687');await dialog.getByLabel(/Product name/).fill('Walkaroo Daily Sandal');

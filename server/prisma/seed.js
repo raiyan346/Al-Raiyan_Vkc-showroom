@@ -1,10 +1,16 @@
 import '../src/config.js';
 import bcrypt from 'bcryptjs';
+import {appEnv} from '../src/config.js';
+import {verifyDatabaseIdentity} from '../src/environment.js';
+import {seedDemo} from '../scripts/demo-data.js';
 import {randomUUID} from 'node:crypto';
 import {db} from '../src/db.js';
 import {createSale} from '../src/sales.js';
 import {backfillInventory} from '../src/inventory.js';
 async function main(){
+ if(appEnv==='development'&&/^postgres(?:ql)?:/.test(process.env.DATABASE_URL||'')&&process.env.SEED_SAMPLE_DATA==='true')throw new Error('PostgreSQL sample seeding requires an explicitly isolated demo environment.');
+ await verifyDatabaseIdentity({initialize:true});
+ if(appEnv==='demo')return seedDemo();
  await db.setting.upsert({where:{id:'shop'},update:{},create:{id:'shop'}});
  const passwords={OWNER:process.env.OWNER_PASSWORD,STAFF:process.env.STAFF_PASSWORD};
  for(const [role,password] of Object.entries(passwords)){
@@ -12,7 +18,7 @@ async function main(){
   if(!password||password.length<10||password.startsWith('choose-'))throw new Error(`Set ${role}_PASSWORD in .env to at least 10 characters before seeding.`);
   await db.user.create({data:{username,name:role==='OWNER'?'Shop Owner':'Shop Staff',role,passwordHash:await bcrypt.hash(password,12)}});
  }
- if(process.env.SEED_SAMPLE_DATA!=='true'||await db.product.count()){await backfillInventory();console.log('Accounts and settings ready. Existing records preserved.');return;}
+ if(appEnv==='production'||process.env.SEED_SAMPLE_DATA!=='true'||await db.product.count()){await backfillInventory();console.log('Accounts and settings ready. Existing records preserved.');return;}
  const samples=[
   ['VKC Gents Comfort Sandal','VKC','Sandals','8','Brown',599,300,24],
   ['VKC Gents Comfort Sandal','VKC','Sandals','9','Brown',599,300,18],

@@ -16,6 +16,19 @@ model User {
   sales Sale[]
   createdAt DateTime @default(now())
 }
+model Session {
+  id String @id
+  userId String
+  tokenVersion Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([expiresAt])
+}
+model EnvironmentIdentity {
+  id String @id @default("environment")
+  name String
+}
 model Setting {
   id String @id @default("shop")
   shopName String @default("Al-Raiyan VKC Show Room")

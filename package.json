@@ -1,17 +1,45 @@
 {
-  "name": "al-raiyan-pos", "private": true, "version": "1.0.0", "type":"module",
-  "workspaces": ["packages/core", "server", "client"],
+  "name": "al-raiyan-pos",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/core",
+    "server",
+    "client"
+  ],
   "scripts": {
     "dev": "concurrently -k -n API,WEB \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
     "start": "npm start -w server",
-    "start:render": "npm run db:setup && npm run db:seed && npm start",
+    "start:render": "node server/scripts/start-hosted.js",
     "db:setup": "npm run db:setup -w server",
     "db:seed": "npm run db:seed -w server",
     "test": "npm test -w packages/core && npm test -w server",
-    "test:browser": "node tools/browser-run.js"
+    "test:browser": "node tools/browser-run.js",
+    "db:migrate:production": "node server/scripts/migrate-environment.js production",
+    "db:migrate:demo": "node server/scripts/migrate-environment.js demo",
+    "db:seed:demo": "node server/scripts/seed-demo.js",
+    "db:reset:demo": "node server/scripts/reset-demo.js",
+    "admin:password": "node server/scripts/admin-password.js",
+    "release:verify": "node tools/verify-release.js"
   },
-  "engines": {"node": ">=22.16.0 <23"},
-  "devDependencies": {"concurrently": "^9.1.2", "@playwright/test": "^1.56.1"},
-  "overrides": {"deepmerge-ts":"^8.0.0", "effect":"^3.20.0", "exceljs":{"uuid":"^11.1.1"}, "workbox-build":{"glob":"^14.0.6", "minimatch":"^11.0.9"}}
+  "engines": {
+    "node": ">=22.16.0 <23"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "@playwright/test": "^1.56.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "effect": "^3.20.0",
+    "exceljs": {
+      "uuid": "^11.1.1"
+    },
+    "workbox-build": {
+      "glob": "^14.0.6",
+      "minimatch": "^11.0.9"
+    }
+  }
 }

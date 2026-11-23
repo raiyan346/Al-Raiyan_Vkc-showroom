@@ -23,6 +23,17 @@ const commands=[['generate','--schema',target]];
 if(provider==='postgresql'&&!process.argv.includes('--generate-only')&&new URL(process.env.DIRECT_URL||process.env.DATABASE_URL).hostname.includes('-pooler.'))throw new Error('Set DIRECT_URL to the non-pooler PostgreSQL endpoint before running migrations.');
 if(!process.argv.includes('--generate-only'))commands.push(provider==='postgresql'?['migrate','deploy','--schema',target]:['db','push','--schema',target]);
 for(const args of commands) {
+ if(provider==='postgresql'&&args[0]==='migrate'){
+  const {appEnv,validateEnvironment}=await import('../src/config.js');validateEnvironment();
+  if(!['production','demo'].includes(appEnv))throw new Error('PostgreSQL migrations require an explicit production or demo environment.');
+  const {db}=await import('../src/db.js');
+  try{
+   const identity=await db.$queryRaw`SELECT current_database() AS name`;
+   if(identity[0]?.name!==process.env.EXPECTED_DATABASE_NAME)throw new Error('Database identity mismatch before migration.');
+   const tables=await db.$queryRaw`SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='EnvironmentIdentity') AS present`;
+   if(tables[0].present){const marker=await db.environmentIdentity.findUnique({where:{id:'environment'}});if(marker&&marker.name!==appEnv)throw new Error('Cross-environment migration refused.');}
+  }finally{await db.$disconnect();}
+ }
  // Migrations need a direct connection; application queries keep the pooled URL.
  const env=provider==='postgresql'&&args[0]==='migrate'&&process.env.DIRECT_URL?{...process.env,DATABASE_URL:process.env.DIRECT_URL}:process.env;
  const r=spawnSync(process.execPath,[cli,...args],{stdio:'inherit',env,cwd:root}); if(r.status!==0)process.exit(r.status||1);

@@ -20,7 +20,8 @@ const setup=spawnSync(process.execPath,[cli,'db','push','--schema',path.join(ser
 if(setup.status!==0)throw new Error(setup.stdout+setup.stderr);
 const {app}=await import('../src/app.js');const {db}=await import('../src/db.js');
 let ownerToken,staffToken,owner,product,customer;
-const auth=(token)=>({Authorization:`Bearer ${token}`});
+const auth=(session)=>({Cookie:session.cookie,'X-CSRF-Token':session.csrf,Origin:'http://localhost:5173'});
+async function login(username){const agent=request.agent(app);const pre=await agent.get('/api/auth/session');const response=await agent.post('/api/auth/login').set({'X-CSRF-Token':pre.body.csrfToken,Origin:'http://localhost:5173'}).send({username,password:'test-password-123'});assert.equal(response.status,200);return {cookie:response.headers['set-cookie'].map(c=>c.split(';')[0]).join('; '),csrf:response.body.csrfToken};}
 const payload=(p,overrides={})=>({id:randomUUID(),items:[{productId:p.id,quantity:2,unitPrice:45000}],discount:10000,paymentMode:'CASH',cashTendered:100000,soldAt:new Date().toISOString(),...overrides});
 before(async()=>{
  await db.setting.create({data:{id:'shop'}});
@@ -29,12 +30,12 @@ before(async()=>{
  await db.user.create({data:{name:'Staff',username:'staff',passwordHash,role:'STAFF'}});
  product=await db.product.create({data:{name:'VKC Sandal',brand:'VKC',category:'Sandals',size:'8',color:'Brown',mrp:59900,purchasePrice:30000,quantity:50,barcode:'TEST0001'}});
  customer=await db.customer.create({data:{name:'Customer',phone:'9876543210'}});
- ownerToken=(await request(app).post('/api/auth/login').send({username:'owner',password:'test-password-123'})).body.token;
- staffToken=(await request(app).post('/api/auth/login').send({username:'staff',password:'test-password-123'})).body.token;
+ ownerToken=await login('owner');
+ staffToken=await login('staff');
 });
 after(async()=>{await db.$disconnect();const resolved=path.resolve(dir);if(resolved.startsWith(path.resolve(testRoot)+path.sep)&&path.basename(resolved).startsWith('alraiyan-test-'))rmSync(resolved,{recursive:true,force:true});});
 test('authentication, role checks and cost confidentiality across product/settings/sale routes',async()=>{
- assert.deepEqual((await request(app).get('/api/auth/session')).body,{publicAccess:false});
+ assert.equal((await request(app).get('/api/auth/session')).body.authenticated,false);
  assert.equal((await request(app).get('/api/products')).status,401);
  for(const route of ['/api/reports','/api/users'])assert.equal((await request(app).get(route).set(auth(staffToken))).status,403);
  const products=(await request(app).get('/api/products').set(auth(staffToken))).body;
@@ -200,4 +201,17 @@ test('backup restores all records atomically into an empty database and refuses 
  const first=restore();assert.equal(first.status,0,first.stderr);
  const {PrismaClient}=await import('@prisma/client');const restored=new PrismaClient({datasources:{db:{url:env.DATABASE_URL}}});
  try{assert.equal(await restored.sale.count(),snapshot.sale.length);assert.equal(await restored.return.count(),snapshot.return.length);assert.equal(await restored.payment.count(),snapshot.payment.length);const second=restore();assert.equal(second.status,1);assert.match(second.stderr,/empty database/);assert.equal(await restored.sale.count(),snapshot.sale.length);}finally{await restored.$disconnect();}
+});
+
+test('cookie sessions reject bearer tokens and CSRF, expire, and are revoked by logout',async()=>{
+ assert.equal((await request(app).get('/api/products').set('Authorization','Bearer fake')).status,401);
+ assert.equal((await request(app).post('/api/products').set('Cookie',ownerToken.cookie).send({})).status,403);
+ assert.equal((await request(app).post('/api/products').set({...auth(ownerToken),Origin:'https://attacker.example'}).send({})).status,403);
+ const fresh=await login('owner');
+ const probe=await request(app).get('/api/auth/session').set('Cookie',fresh.cookie);assert.equal(probe.body.authenticated,true);assert.equal(probe.body.token,undefined);
+ assert.match((await request(app).get('/api/auth/session')).headers['set-cookie'][0],/HttpOnly/);
+ assert.equal((await request(app).post('/api/auth/logout').set(auth(fresh)).send({})).status,200);
+ assert.equal((await request(app).get('/api/products').set('Cookie',fresh.cookie)).status,401);
+ const expired=await login('owner');await db.session.updateMany({where:{userId:owner.id},data:{expiresAt:new Date(0)}});
+ assert.equal((await request(app).get('/api/products').set('Cookie',expired.cookie)).status,401);
 });

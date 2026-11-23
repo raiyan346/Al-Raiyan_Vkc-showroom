@@ -1,17 +1,20 @@
 # REST API
 
-Base URL `/api`. Except login and health, send `Authorization: Bearer <JWT>`. Amounts in API requests/responses are **integer paise**; CSV/Excel import prices are rupees. IDs are UUIDs except generated Code128 values, bill display numbers and payment allocation suffixes. Error responses are JSON `{ "error": "Readable message" }`.
+Base URL `/api`, on the current environment's origin only. Authentication uses an HttpOnly cookie, not bearer tokens. First GET `/auth/session` to obtain a CSRF token; mutations require that token in `X-CSRF-Token`, the matching cookie, JSON content type and the configured Origin. Login rotates the token. Protected APIs return 401 without a valid server session. Amounts are integer paise; CSV/Excel import prices are rupees. Error responses are JSON `{ "error": "Readable message" }`.
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | GET | `/health` | Public | Database health |
-| POST | `/auth/login` | Public, rate limited | `{username,password}` → `{token,user}` |
+| GET | `/auth/session` | Public | Authentication state, safe user identity when authenticated, CSRF token and demo flag |
+| POST | `/auth/login` | Public, rate limited + CSRF | `{username,password}`; sets secure session cookie |
+| POST | `/auth/demo` | Demo only + CSRF | Explore Demo visitor session; unavailable in production |
+| POST | `/auth/logout` | CSRF | Revoke the current server session |
 | GET | `/auth/me` | Both | Current account identity |
-| POST | `/auth/password` | Both | `{current,password}`; revoke existing JWTs |
+| POST | `/auth/password` | Private shop | `{current,password}`; revoke existing sessions |
 | GET/PUT | `/settings` | Read both; write Owner | Shop name/address/phone, low-stock threshold, cipher (Owner only) |
 | POST | `/cost-code/decode` | Owner | `{code}` → rupee `{amount}` |
 | GET/POST | `/users` | Owner | List/create `{name,username,password,role}` |
-| PATCH | `/users/:id` | Owner | `{active}`; revokes prior tokens |
+| PATCH | `/users/:id` | Private Owner | `{active}`; disables existing sessions |
 | GET/POST | `/products` | Both | List/create variants |
 | PUT/DELETE | `/products/:id` | Both | Edit details / soft delete |
 | POST | `/products/:id/restore` | Both | Undo soft delete |

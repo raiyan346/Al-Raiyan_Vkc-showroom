@@ -3,13 +3,13 @@ import express from 'express';
 import helmet from 'helmet';
 import {rateLimit} from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {parse} from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import {db,transaction} from './db.js';
-import {secret,publicAccess} from './config.js';
+import {demoMode} from './config.js';
+import {installAuthentication} from './auth.js';
 import {encodeCost,decodeCost,validateCipher,toPaise,rupees,weightedCost} from '@alraiyan/core';
 import {createSale,createReturn,collectCredit,publicSale,saleInclude} from './sales.js';
 import {report,cashClosing,indiaDay} from './reports.js';
@@ -29,30 +29,8 @@ const safeProduct=serializeProduct;
 const text=z.string().trim().min(1).max(150);
 const productSchema=z.object({name:text,brand:text,category:text,size:text,color:text,mrp:z.number().int().nonnegative().max(1000000000),purchasePrice:z.number().int().nonnegative().max(1000000000).optional(),quantity:z.number().int().nonnegative().max(100000).default(0),photo:z.string().max(1500000).refine(s=>!s||/^data:image\/(png|jpeg|webp);base64,/.test(s)||/^https:\/\//.test(s),'Use an HTTPS image or PNG/JPEG/WebP upload.').nullable().optional()});
 const personSchema=z.object({name:text,phone:z.string().regex(/^(?:\+91)?[6-9]\d{9}$/,'Enter a valid Indian mobile number.').transform(s=>s.replace(/^\+91/,'')),address:z.string().max(500).optional()});
-const loginLimiter=rateLimit({windowMs:15*60*1000,limit:30,standardHeaders:'draft-7',legacyHeaders:false});
-async function shopOwner(){
- const user=await db.user.findUnique({where:{username:'owner'}});
- if(!user?.active||user.role!=='OWNER')throw new Error('The shop owner account is not ready.');
- return user;
-}
 app.get('/api/health',route(async(req,res)=>{await db.$queryRaw`SELECT 1`;res.json({ok:true});}));
-app.get('/api/auth/session',route(async(req,res)=>{
- if(!publicAccess)return res.json({publicAccess:false});
- const user=await shopOwner();
- res.json({publicAccess:true,user:{id:user.id,name:user.name,role:user.role}});
-}));
-app.post('/api/auth/login',loginLimiter,route(async(req,res)=>{
- const data=z.object({username:text,password:z.string().min(1).max(200)}).parse(req.body);
- const user=await db.user.findUnique({where:{username:data.username}});
- if(!user?.active||!await bcrypt.compare(data.password,user.passwordHash))return res.status(401).json({error:'Username or password is incorrect.'});
- const token=jwt.sign({sub:user.id,v:user.tokenVersion},secret,{expiresIn:'7d',algorithm:'HS256'});
- res.json({token,user:{id:user.id,name:user.name,role:user.role}});
-}));
-app.use('/api',route(async(req,res,next)=>{
- if(publicAccess){req.user=await shopOwner();return next();}
- try{const token=req.headers.authorization?.replace(/^Bearer /,'');const claims=jwt.verify(token,secret,{algorithms:['HS256']});const user=await db.user.findUnique({where:{id:claims.sub}});if(!user?.active||claims.v!==user.tokenVersion)throw new Error();req.user=user;next();}catch{return res.status(401).json({error:'Please sign in again. Your saved offline bills are still on this device.'});}
-}));
-app.use(['/api/users','/api/auth/password'],(req,res,next)=>publicAccess?res.status(403).json({error:'Account and password controls are unavailable without sign-in.'}):next());
+installAuthentication(app,route);
 app.get('/api/auth/me',(req,res)=>res.json({id:req.user.id,name:req.user.name,role:req.user.role}));
 app.post('/api/auth/password',route(async(req,res)=>{const data=z.object({current:z.string(),password:z.string().min(10).max(200)}).parse(req.body);if(!await bcrypt.compare(data.current,req.user.passwordHash))throw new Error('Current password is incorrect.');await db.user.update({where:{id:req.user.id},data:{passwordHash:await bcrypt.hash(data.password,12),tokenVersion:{increment:1}}});res.json({ok:true});}));
 app.get('/api/settings',route(async(req,res)=>{const {cipher,...s}=await db.setting.findUniqueOrThrow({where:{id:'shop'}});res.json(req.user.role==='OWNER'?{...s,cipher}:s);}));
@@ -128,5 +106,5 @@ app.use((err,req,res,next)=>{
  if(res.headersSent)return next(err);
  const status=err instanceof z.ZodError?400:err.code==='P2025'?404:err.code==='P2002'?409:err.code?.startsWith('P')?500:400;
  const message=err instanceof z.ZodError?err.issues.map(i=>`${i.path.join('.')}: ${i.message}`).join('; '):err.code==='P2002'?'That record already exists.':err.code==='P2025'?'Record not found.':status===500?'Database request failed. Please retry.':err.message;
- if(status===500)console.error(err);res.status(status).json({error:message});
+ if(status===500)console.error('Database request failed.',{code:err.code});res.status(status).json({error:message});
 });
